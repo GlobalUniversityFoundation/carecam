@@ -142,39 +142,82 @@ export default function UploadVideoModalTrigger({
     fingerprint: { durationSeconds: number; firstFrameHash: string; lastFrameHash: string },
   ) =>
     new Promise<{ uploadedAt?: string; status?: string }>((resolve, reject) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("icdCode", icdCode);
-      formData.append("durationSeconds", String(fingerprint.durationSeconds));
-      formData.append("firstFrameHash", fingerprint.firstFrameHash);
-      formData.append("lastFrameHash", fingerprint.lastFrameHash);
+      void (async () => {
+        const prepareRes = await fetch("/api/children/videos/prepare", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            icdCode,
+            fileName: file.name,
+            mimeType: file.type || "application/octet-stream",
+            fileSize: file.size,
+            durationSeconds: fingerprint.durationSeconds,
+            firstFrameHash: fingerprint.firstFrameHash,
+            lastFrameHash: fingerprint.lastFrameHash,
+          }),
+        });
+        const preparePayload = (await prepareRes.json().catch(() => ({}))) as {
+          message?: string;
+          uploadUrl?: string;
+          uploadEpoch?: string;
+          storagePath?: string;
+          safeName?: string;
+          mimeType?: string;
+        };
+        if (!prepareRes.ok || !preparePayload.uploadUrl || !preparePayload.uploadEpoch || !preparePayload.storagePath) {
+          reject(new Error(preparePayload.message || "Failed to prepare upload."));
+          return;
+        }
 
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/children/videos");
-      xhr.upload.onprogress = (event) => {
-        if (!event.lengthComputable) {
-          return;
-        }
-        const percent = Math.round((event.loaded / event.total) * 100);
-        setUploads((current) =>
-          current.map((item) => (item.id === id ? { ...item, progress: percent } : item)),
-        );
-      };
-      xhr.onload = () => {
-        let responseJson: { message?: string; uploadedAt?: string; status?: string } = {};
-        try {
-          responseJson = JSON.parse(xhr.responseText || "{}");
-        } catch {
-          responseJson = {};
-        }
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(responseJson);
-          return;
-        }
-        reject(new Error(responseJson.message || "Upload failed."));
-      };
-      xhr.onerror = () => reject(new Error("Network error during upload."));
-      xhr.send(formData);
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", preparePayload.uploadUrl);
+        xhr.setRequestHeader("Content-Type", preparePayload.mimeType || file.type || "application/octet-stream");
+        xhr.upload.onprogress = (event) => {
+          if (!event.lengthComputable) {
+            return;
+          }
+          const percent = Math.round((event.loaded / event.total) * 100);
+          setUploads((current) =>
+            current.map((item) => (item.id === id ? { ...item, progress: percent } : item)),
+          );
+        };
+        xhr.onload = () => {
+          if (!(xhr.status >= 200 && xhr.status < 300)) {
+            reject(new Error("Upload failed."));
+            return;
+          }
+          void (async () => {
+            const completeRes = await fetch("/api/children/videos/complete", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                icdCode,
+                uploadEpoch: preparePayload.uploadEpoch,
+                storagePath: preparePayload.storagePath,
+                safeName: preparePayload.safeName || file.name,
+                durationSeconds: fingerprint.durationSeconds,
+                firstFrameHash: fingerprint.firstFrameHash,
+                lastFrameHash: fingerprint.lastFrameHash,
+                mimeType: preparePayload.mimeType || file.type || "application/octet-stream",
+              }),
+            });
+            const completePayload = (await completeRes.json().catch(() => ({}))) as {
+              message?: string;
+              uploadedAt?: string;
+              status?: string;
+            };
+            if (!completeRes.ok) {
+              reject(new Error(completePayload.message || "Failed to finalize upload."));
+              return;
+            }
+            resolve(completePayload);
+          })().catch(() => reject(new Error("Failed to finalize upload.")));
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload."));
+        xhr.send(file);
+      })().catch((error: unknown) => {
+        reject(error instanceof Error ? error : new Error("Upload failed."));
+      });
     });
 
   const queueFiles = async (incomingFiles: File[]) => {
