@@ -14,13 +14,129 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #ffffff;
+    --foreground: #171717;
   }
+}
+
+html,
+body {
+  min-height: 100%;
+  background: #ffffff;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.entries-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.entries-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.entries-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.entries-scroll:hover::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #cbd5e1 0%, #94a3b8 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    0 2px 6px rgba(15, 23, 42, 0.28);
+}
+
+.entries-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.entries-scroll:hover {
+  scrollbar-color: #94a3b8 transparent;
+}
+
+.add-child-input::placeholder {
+  color: #637387;
+  opacity: 1;
+}
+
+.add-child-select {
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #637387;
+}
+
+.add-child-select option {
+  background-color: #ffffff;
+  color: #121712;
+}
+
+.add-child-select:valid {
+  color: #121712;
+}
+
+.add-child-date-input:invalid {
+  color: #637387;
+}
+
+.add-child-date-input:valid {
+  color: #121712;
+}
+
+.timeline-zoom-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    #2563eb var(--zoom-progress, 0%),
+    #eaecf0 var(--zoom-progress, 0%)
+  );
+  outline: none;
+}
+
+.timeline-zoom-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.timeline-zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 4px solid #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+}
+
+.timeline-zoom-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #eaecf0;
+}
+
+.timeline-zoom-slider::-moz-range-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: #2563eb;
+}
+
+.timeline-zoom-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 4px solid #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
 }
