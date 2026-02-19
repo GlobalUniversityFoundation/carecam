@@ -171,7 +171,6 @@ export default function UploadVideoModalTrigger({
 
         const xhr = new XMLHttpRequest();
         xhr.open("PUT", preparePayload.uploadUrl);
-        xhr.setRequestHeader("Content-Type", preparePayload.mimeType || file.type || "application/octet-stream");
         xhr.upload.onprogress = (event) => {
           if (!event.lengthComputable) {
             return;
@@ -491,7 +490,7 @@ export default function UploadVideoModalTrigger({
                 whiteSpace: "nowrap",
               }}
             >
-              MP4, AVI formats, up to 200MB
+              MP4, AVI formats, up to 1GB
             </p>
             <input
               ref={fileInputRef}

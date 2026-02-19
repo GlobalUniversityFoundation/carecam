@@ -20,17 +20,27 @@ function getBucket(bucketNameOverride) {
   const serviceAccountPath =
     process.env.FIREBASE_SERVICE_ACCOUNT_PATH || DEFAULT_SERVICE_ACCOUNT_PATH;
   const bucketName = bucketNameOverride || process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_BUCKET;
-
-  if (!fs.existsSync(serviceAccountPath)) {
-    throw new Error(`Service account JSON not found: ${serviceAccountPath}`);
-  }
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
   if (!getApps().length) {
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
-    initializeApp({
-      credential: cert(serviceAccount),
-      storageBucket: bucketName,
-    });
+    if (serviceAccountJson?.trim()) {
+      const serviceAccount = JSON.parse(serviceAccountJson);
+      initializeApp({
+        credential: cert(serviceAccount),
+        storageBucket: bucketName,
+      });
+    } else if (fs.existsSync(serviceAccountPath)) {
+      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
+      initializeApp({
+        credential: cert(serviceAccount),
+        storageBucket: bucketName,
+      });
+    } else {
+      // Cloud Run can use Application Default Credentials from its runtime service account.
+      initializeApp({
+        storageBucket: bucketName,
+      });
+    }
   }
 
   return getStorage().bucket(bucketName);

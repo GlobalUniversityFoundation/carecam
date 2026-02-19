@@ -42,8 +42,8 @@ export async function POST(req: Request) {
     if (!isSupportedVideo(fileName, mimeType)) {
       return NextResponse.json({ message: "Unsupported file type. Use MP4 or AVI." }, { status: 400 });
     }
-    if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > 200 * 1024 * 1024) {
-      return NextResponse.json({ message: "File exceeds 200MB limit." }, { status: 400 });
+    if (!Number.isFinite(fileSize) || fileSize <= 0 || fileSize > 1024 * 1024 * 1024) {
+      return NextResponse.json({ message: "File exceeds 1GB limit." }, { status: 400 });
     }
 
     const bucket = getBucket();
@@ -77,7 +77,6 @@ export async function POST(req: Request) {
       version: "v4",
       action: "write",
       expires: Date.now() + 15 * 60 * 1000,
-      contentType: mimeType,
     });
 
     return NextResponse.json(
