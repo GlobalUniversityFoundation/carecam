@@ -10,7 +10,6 @@ const manrope = Manrope({
 });
 
 export default function Home() {
-  const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
@@ -51,8 +50,7 @@ export default function Home() {
     setFeedback(null);
 
     try {
-      const endpoint = isSignUpMode ? "/api/auth/signup" : "/api/auth/signin";
-      const response = await fetch(endpoint, {
+      const response = await fetch("/api/auth/signin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -66,12 +64,7 @@ export default function Home() {
       const responseData = (await response.json()) as { message?: string; code?: string };
 
       if (response.ok) {
-        if (isSignUpMode) {
-          showTimedFeedback({ kind: "success", text: "Successful sign up." });
-          setPassword("");
-        } else {
-          window.location.href = "/home";
-        }
+        window.location.href = "/home";
         return;
       }
 
@@ -82,18 +75,12 @@ export default function Home() {
 
       showTimedFeedback({
         kind: "error",
-        text:
-          responseData.message ||
-          (isSignUpMode
-            ? "Unable to sign up. Please try again."
-            : "Invalid email or password."),
+        text: responseData.message || "Invalid email or password.",
       });
     } catch {
       showTimedFeedback({
         kind: "error",
-        text: isSignUpMode
-          ? "Unable to sign up. Please try again."
-          : "Unable to sign in. Please try again.",
+        text: "Unable to sign in. Please try again.",
       });
     } finally {
       setIsSubmittingAuth(false);
@@ -147,7 +134,7 @@ export default function Home() {
               letterSpacing: "0px",
             }}
           >
-            {isSignUpMode ? "Sign-Up" : "Sign-in"}
+            Sign-in
           </p>
         </div>
         <div
@@ -235,12 +222,8 @@ export default function Home() {
               }}
             >
               {isSubmittingAuth
-                ? isSignUpMode
-                  ? "Signing Up..."
-                  : "Signing In..."
-                : isSignUpMode
-                  ? "Sign Up"
-                  : "Login"}
+                ? "Signing In..."
+                : "Login"}
             </button>
             {feedback ? (
               <p
@@ -256,41 +239,6 @@ export default function Home() {
                 {feedback.text}
               </p>
             ) : null}
-            <p
-              className={`${manrope.className} m-0 text-center text-[#8A94A6]`}
-              style={{
-                fontWeight: 400,
-                fontSize: "14px",
-                lineHeight: "18.85px",
-                letterSpacing: "0px",
-                textAlign: "center",
-              }}
-            >
-              {isSignUpMode
-                ? "Already have an account? "
-                : "Don't have an account? "}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsSignUpMode((currentMode) => !currentMode);
-                  setFeedback(null);
-                }}
-                style={{
-                  color: "#0A52C7",
-                  fontWeight: 600,
-                  fontSize: "14px",
-                  lineHeight: "18.85px",
-                  letterSpacing: "0px",
-                  textAlign: "center",
-                  background: "transparent",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                }}
-              >
-                {isSignUpMode ? "Sign In" : "Sign Up"}
-              </button>
-            </p>
           </form>
         </div>
       </div>

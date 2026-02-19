@@ -24,13 +24,18 @@ function getBucket() {
   const serviceAccountPath =
     process.env.FIREBASE_SERVICE_ACCOUNT_PATH || DEFAULT_SERVICE_ACCOUNT_PATH;
   const bucketName = process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_BUCKET;
-
-  if (!fs.existsSync(serviceAccountPath)) {
-    throw new Error(`Service account JSON not found at ${serviceAccountPath}`);
-  }
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
   if (!getApps().length) {
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
+    const serviceAccount = serviceAccountJson?.trim()
+      ? JSON.parse(serviceAccountJson)
+      : (() => {
+          if (!fs.existsSync(serviceAccountPath)) {
+            throw new Error(`Service account JSON not found at ${serviceAccountPath}`);
+          }
+          return JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
+        })();
+
     initializeApp({
       credential: cert(serviceAccount),
       storageBucket: bucketName,

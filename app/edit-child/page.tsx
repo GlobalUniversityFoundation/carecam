@@ -2,7 +2,7 @@
 
 import { Manrope } from "next/font/google";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import ProfileMenu from "@/app/components/profile-menu";
 
 const manrope = Manrope({
@@ -12,8 +12,8 @@ const manrope = Manrope({
 
 export default function AddChildPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const originalIcdCode = (searchParams.get("icd") || "").trim();
+  const [originalIcdCode, setOriginalIcdCode] = useState("");
+  const [isQueryReady, setIsQueryReady] = useState(false);
   const [childName, setChildName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
@@ -69,8 +69,17 @@ export default function AddChildPage() {
   const commonInputPaddingLeftPx = 14.36;
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setOriginalIcdCode((params.get("icd") || "").trim());
+    setIsQueryReady(true);
+  }, []);
+
+  useEffect(() => {
     let isCancelled = false;
     const loadChildData = async () => {
+      if (!isQueryReady) {
+        return;
+      }
       if (!originalIcdCode) {
         setIsLoadingChildData(false);
         showTimedFeedback({ kind: "error", text: "Missing child reference." });
@@ -131,7 +140,7 @@ export default function AddChildPage() {
     return () => {
       isCancelled = true;
     };
-  }, [originalIcdCode]);
+  }, [originalIcdCode, isQueryReady]);
 
   useEffect(() => {
     let isCancelled = false;

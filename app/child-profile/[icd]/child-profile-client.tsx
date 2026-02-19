@@ -97,21 +97,6 @@ export default function ChildProfileClient({ icd }: ChildProfileClientProps) {
     setSessionRows(sessionData.sessions || []);
   };
 
-  const refreshTrend = async () => {
-    setIsTrendLoading(true);
-    try {
-      const trendRes = await fetch(`/api/children/behavior-trend?icd=${encodeURIComponent(icd)}`, {
-        cache: "no-store",
-      });
-      const trendData = trendRes.ok
-        ? ((await trendRes.json()) as { trend?: TrendPoint[] })
-        : { trend: [] };
-      setTrendRows(Array.isArray(trendData.trend) ? trendData.trend : []);
-    } finally {
-      setIsTrendLoading(false);
-    }
-  };
-
   useEffect(() => {
     let cancelled = false;
     const loadPageData = async () => {
