@@ -149,6 +149,14 @@ export function getBucket() {
     ? envServiceAccount.source
     : "file_path";
 
+  const existingDefaultApp = getApps().find((app) => app.name === "[DEFAULT]");
+  if (!existingDefaultApp) {
+    initializeApp({
+      credential: cert(serviceAccount),
+      storageBucket: bucketName,
+    });
+  }
+
   const existingUploadApp = getApps().find((app) => app.name === UPLOAD_APP_NAME);
   const app =
     existingUploadApp
