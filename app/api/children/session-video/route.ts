@@ -29,13 +29,84 @@ type SessionRecord = {
 function getBucket() {
   const serviceAccountPath =
     process.env.FIREBASE_SERVICE_ACCOUNT_PATH || DEFAULT_SERVICE_ACCOUNT_PATH;
-  const bucketName = process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_BUCKET;
+  const bucketName = (process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_BUCKET).trim();
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const serviceAccountJsonB64 = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_B64;
+
+  const parseServiceAccountFromEnv = () => {
+    const rawSources: string[] = [];
+    if (serviceAccountJson?.trim()) {
+      rawSources.push(serviceAccountJson.trim());
+    }
+    if (serviceAccountJsonB64?.trim()) {
+      try {
+        rawSources.push(Buffer.from(serviceAccountJsonB64.trim(), "base64").toString("utf8").trim());
+      } catch {
+        // Ignore malformed base64 and try the JSON env value/file path fallback.
+      }
+    }
+    if (!rawSources.length) return null;
+
+    let parsed: unknown = null;
+    for (const raw of rawSources) {
+      const candidates = new Set<string>([raw]);
+      if (
+        (raw.startsWith('"') && raw.endsWith('"')) ||
+        (raw.startsWith("'") && raw.endsWith("'"))
+      ) {
+        candidates.add(raw.slice(1, -1));
+      }
+      candidates.add(raw.replace(/\\"/g, '"'));
+
+      for (const candidate of candidates) {
+        try {
+          parsed = JSON.parse(candidate);
+        } catch {
+          parsed = null;
+        }
+        if (typeof parsed === "string") {
+          try {
+            parsed = JSON.parse(parsed);
+          } catch {
+            parsed = null;
+          }
+        }
+        if (parsed && typeof parsed === "object") {
+          break;
+        }
+      }
+      if (parsed && typeof parsed === "object") {
+        break;
+      }
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    const normalized = parsed as {
+      private_key?: string;
+      client_email?: string;
+      [key: string]: unknown;
+    };
+    if (typeof normalized.private_key === "string") {
+      let pk = normalized.private_key;
+      for (let i = 0; i < 3; i += 1) {
+        pk = pk.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n");
+      }
+      normalized.private_key = pk.trim();
+    }
+    if (typeof normalized.client_email === "string") {
+      normalized.client_email = normalized.client_email.trim();
+    }
+    if (!normalized.private_key || !normalized.client_email) {
+      return null;
+    }
+    return normalized;
+  };
 
   if (!getApps().length) {
-    const serviceAccount = serviceAccountJson?.trim()
-      ? JSON.parse(serviceAccountJson)
-      : (() => {
+    const serviceAccount = parseServiceAccountFromEnv()
+      || (() => {
           if (!fs.existsSync(serviceAccountPath)) {
             throw new Error(`Service account JSON not found at ${serviceAccountPath}`);
           }
