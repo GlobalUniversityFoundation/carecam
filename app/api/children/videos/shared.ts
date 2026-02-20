@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { verifyAuthToken } from "@/lib/jwt";
 
-const DEFAULT_BUCKET = "storiesrus-d450d.appspot.com";
+const DEFAULT_BUCKET = "video-analytics-465406.firebasestorage.app";
 const DEFAULT_SERVICE_ACCOUNT_PATH = path.join(
   process.cwd(),
   "secrets",
@@ -35,34 +35,48 @@ export function getBucket() {
   const serviceAccountJsonB64 = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_B64;
 
   const parseServiceAccountFromEnv = () => {
-    const raw = (serviceAccountJsonB64?.trim()
-      ? Buffer.from(serviceAccountJsonB64.trim(), "base64").toString("utf8")
-      : serviceAccountJson || "").trim();
-    if (!raw) return null;
-
-    const candidates = new Set<string>([raw]);
-    if (
-      (raw.startsWith('"') && raw.endsWith('"')) ||
-      (raw.startsWith("'") && raw.endsWith("'"))
-    ) {
-      candidates.add(raw.slice(1, -1));
+    const rawSources: string[] = [];
+    if (serviceAccountJson?.trim()) {
+      rawSources.push(serviceAccountJson.trim());
     }
-    candidates.add(raw.replace(/\\"/g, '"'));
+    if (serviceAccountJsonB64?.trim()) {
+      try {
+        rawSources.push(Buffer.from(serviceAccountJsonB64.trim(), "base64").toString("utf8").trim());
+      } catch {
+        // Ignore malformed base64; JSON env var is the primary source.
+      }
+    }
+    if (!rawSources.length) return null;
 
     let parsed: unknown = null;
-    for (const candidate of candidates) {
-      try {
-        parsed = JSON.parse(candidate);
-      } catch {
-        parsed = null;
+    for (const raw of rawSources) {
+      const candidates = new Set<string>([raw]);
+      if (
+        (raw.startsWith('"') && raw.endsWith('"')) ||
+        (raw.startsWith("'") && raw.endsWith("'"))
+      ) {
+        candidates.add(raw.slice(1, -1));
       }
-      if (typeof parsed === "string") {
+      candidates.add(raw.replace(/\\"/g, '"'));
+
+      for (const candidate of candidates) {
         try {
-          parsed = JSON.parse(parsed);
+          parsed = JSON.parse(candidate);
         } catch {
           parsed = null;
         }
+        if (typeof parsed === "string") {
+          try {
+            parsed = JSON.parse(parsed);
+          } catch {
+            parsed = null;
+          }
+        }
+        if (parsed && typeof parsed === "object") {
+          break;
+        }
       }
+
       if (parsed && typeof parsed === "object") {
         break;
       }

@@ -66,7 +66,7 @@ On failure, session is updated to `Failed` with `processingError`.
 
 ### Required Environment Variables
 
-- `FIREBASE_STORAGE_BUCKET` (defaults to `storiesrus-d450d.appspot.com`)
+- `FIREBASE_STORAGE_BUCKET` (defaults to `video-analytics-465406.firebasestorage.app`)
 - `FIREBASE_SERVICE_ACCOUNT_PATH` (path to Firebase Admin JSON)
 - `GEMINI_API_KEY`
 - `GEMINI_MODEL` (optional, defaults to `gemini-2.5-flash`)

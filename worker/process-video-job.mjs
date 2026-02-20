@@ -5,7 +5,7 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { analyzeVideo } from "./analyzer-core.mjs";
 
-const DEFAULT_BUCKET = "storiesrus-d450d.appspot.com";
+const DEFAULT_BUCKET = "video-analytics-465406.firebasestorage.app";
 const DEFAULT_SERVICE_ACCOUNT_PATH = path.join(
   process.cwd(),
   "secrets",

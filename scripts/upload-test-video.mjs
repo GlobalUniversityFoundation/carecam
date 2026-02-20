@@ -10,7 +10,7 @@ const DEFAULT_SERVICE_ACCOUNT = path.join(
   "storiesrus-d450d-firebase-adminsdk-iuwd4-fdc0e0c4cd.json",
 );
 const DEFAULT_SOURCE_VIDEO = path.join(PROJECT_ROOT, "public", "video.mp4");
-const DEFAULT_BUCKET = "storiesrus-d450d.appspot.com";
+const DEFAULT_BUCKET = "video-analytics-465406.firebasestorage.app";
 const DEFAULT_DESTINATION = "carecam/videos/video.mp4";
 
 async function main() {

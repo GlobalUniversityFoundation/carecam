@@ -14,7 +14,7 @@ const manrope = Manrope({
   weight: ["400", "500", "700"],
 });
 
-const DEFAULT_BUCKET = "storiesrus-d450d.appspot.com";
+const DEFAULT_BUCKET = "video-analytics-465406.firebasestorage.app";
 const DEFAULT_SERVICE_ACCOUNT_PATH = path.join(
   process.cwd(),
   "secrets",

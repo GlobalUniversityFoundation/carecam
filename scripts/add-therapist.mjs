@@ -10,7 +10,7 @@ const DEFAULT_SERVICE_ACCOUNT = path.join(
   "secrets",
   "storiesrus-d450d-firebase-adminsdk-iuwd4-fdc0e0c4cd.json",
 );
-const DEFAULT_BUCKET = "storiesrus-d450d.appspot.com";
+const DEFAULT_BUCKET = "video-analytics-465406.firebasestorage.app";
 const USERS_PREFIX = "carecam/users";
 const THERAPISTS_PREFIX = "carecam/therapists";
 

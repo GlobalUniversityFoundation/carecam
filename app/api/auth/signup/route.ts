@@ -7,7 +7,7 @@ import { getStorage } from "firebase-admin/storage";
 
 export const runtime = "nodejs";
 
-const DEFAULT_BUCKET = "storiesrus-d450d.appspot.com";
+const DEFAULT_BUCKET = "video-analytics-465406.firebasestorage.app";
 const DEFAULT_SERVICE_ACCOUNT_PATH = path.join(
   process.cwd(),
   "secrets",
