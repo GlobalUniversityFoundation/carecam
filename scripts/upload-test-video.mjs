@@ -7,7 +7,7 @@ const PROJECT_ROOT = process.cwd();
 const DEFAULT_SERVICE_ACCOUNT = path.join(
   PROJECT_ROOT,
   "secrets",
-  "storiesrus-d450d-firebase-adminsdk-iuwd4-fdc0e0c4cd.json",
+  "firebase-service-account.json",
 );
 const DEFAULT_SOURCE_VIDEO = path.join(PROJECT_ROOT, "public", "video.mp4");
 const DEFAULT_BUCKET = "video-analytics-465406.firebasestorage.app";

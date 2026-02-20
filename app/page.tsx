@@ -254,7 +254,7 @@ export default function Home() {
           className="object-cover"
           style={{ objectPosition: `${imageHorizontalFocusPercent}% center` }}
           sizes={`${leftPanelWidthPercent}vw`}
-        />
+            />
       </section>
       <section className="h-full flex-1 bg-white" />
       <p

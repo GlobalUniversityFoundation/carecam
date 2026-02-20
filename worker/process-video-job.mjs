@@ -9,7 +9,7 @@ const DEFAULT_BUCKET = "video-analytics-465406.firebasestorage.app";
 const DEFAULT_SERVICE_ACCOUNT_PATH = path.join(
   process.cwd(),
   "secrets",
-  "storiesrus-d450d-firebase-adminsdk-iuwd4-fdc0e0c4cd.json",
+  "firebase-service-account.json",
 );
 
 const CHILD_VIDEOS_PREFIX = "carecam/child_videos/";
