@@ -17,6 +17,16 @@ export const CHILD_PROFILES_PREFIX = "carecam/child_profiles";
 export const CHILD_VIDEOS_PREFIX = "carecam/child_videos";
 export const CHILD_VIDEO_SESSIONS_PREFIX = "carecam/child_video_sessions";
 
+type FirebaseDebugInfo = {
+  bucketName: string;
+  credentialSource: "env_json" | "env_b64" | "file_path" | "unknown";
+  serviceAccountEmail: string | null;
+  serviceAccountProjectId: string | null;
+  serviceAccountPath: string;
+};
+
+let lastFirebaseDebugInfo: FirebaseDebugInfo | null = null;
+
 type ChildProfileRecord = {
   center?: string;
 };
@@ -35,13 +45,19 @@ export function getBucket() {
   const serviceAccountJsonB64 = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_B64;
 
   const parseServiceAccountFromEnv = () => {
-    const rawSources: string[] = [];
+    const rawSources: Array<{
+      source: "env_json" | "env_b64";
+      raw: string;
+    }> = [];
     if (serviceAccountJson?.trim()) {
-      rawSources.push(serviceAccountJson.trim());
+      rawSources.push({ source: "env_json", raw: serviceAccountJson.trim() });
     }
     if (serviceAccountJsonB64?.trim()) {
       try {
-        rawSources.push(Buffer.from(serviceAccountJsonB64.trim(), "base64").toString("utf8").trim());
+        rawSources.push({
+          source: "env_b64",
+          raw: Buffer.from(serviceAccountJsonB64.trim(), "base64").toString("utf8").trim(),
+        });
       } catch {
         // Ignore malformed base64; JSON env var is the primary source.
       }
@@ -49,7 +65,9 @@ export function getBucket() {
     if (!rawSources.length) return null;
 
     let parsed: unknown = null;
-    for (const raw of rawSources) {
+    let parsedSource: "env_json" | "env_b64" | null = null;
+    for (const entry of rawSources) {
+      const raw = entry.raw;
       const candidates = new Set<string>([raw]);
       if (
         (raw.startsWith('"') && raw.endsWith('"')) ||
@@ -73,11 +91,13 @@ export function getBucket() {
           }
         }
         if (parsed && typeof parsed === "object") {
+          parsedSource = entry.source;
           break;
         }
       }
 
       if (parsed && typeof parsed === "object") {
+        parsedSource = entry.source;
         break;
       }
     }
@@ -109,25 +129,61 @@ export function getBucket() {
       return null;
     }
 
-    return normalized;
+    return {
+      serviceAccount: normalized,
+      source: parsedSource || "env_json",
+    };
   };
 
   if (!getApps().length) {
-    const serviceAccount = parseServiceAccountFromEnv()
-      || (() => {
+    const envServiceAccount = parseServiceAccountFromEnv();
+    const fromFile = () => {
           if (!fs.existsSync(serviceAccountPath)) {
             throw new Error(`Service account JSON not found at ${serviceAccountPath}`);
           }
           return JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
-        })();
+        };
+    const serviceAccount = envServiceAccount?.serviceAccount || fromFile();
+    const credentialSource: FirebaseDebugInfo["credentialSource"] = envServiceAccount
+      ? envServiceAccount.source
+      : "file_path";
 
     initializeApp({
       credential: cert(serviceAccount),
       storageBucket: bucketName,
     });
+    lastFirebaseDebugInfo = {
+      bucketName,
+      credentialSource,
+      serviceAccountEmail:
+        typeof serviceAccount?.client_email === "string" ? serviceAccount.client_email : null,
+      serviceAccountProjectId:
+        typeof serviceAccount?.project_id === "string" ? serviceAccount.project_id : null,
+      serviceAccountPath,
+    };
+  } else if (!lastFirebaseDebugInfo) {
+    lastFirebaseDebugInfo = {
+      bucketName,
+      credentialSource: "unknown",
+      serviceAccountEmail: null,
+      serviceAccountProjectId: null,
+      serviceAccountPath,
+    };
   }
 
   return getStorage().bucket(bucketName);
+}
+
+export function getFirebaseDebugInfo(): FirebaseDebugInfo {
+  return (
+    lastFirebaseDebugInfo || {
+      bucketName: process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_BUCKET,
+      credentialSource: "unknown",
+      serviceAccountEmail: null,
+      serviceAccountProjectId: null,
+      serviceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH || DEFAULT_SERVICE_ACCOUNT_PATH,
+    }
+  );
 }
 
 export function normalizeIcdCodeForFile(icdCode: string) {

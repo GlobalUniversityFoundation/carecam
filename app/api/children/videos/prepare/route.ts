@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   checkDuplicateByFingerprint,
+  getFirebaseDebugInfo,
   getBucket,
   isSupportedVideo,
   normalizeIcdCodeForFile,
@@ -78,6 +79,17 @@ export async function POST(req: Request) {
       action: "write",
       expires: Date.now() + 15 * 60 * 1000,
     });
+    const firebaseDebug = getFirebaseDebugInfo();
+    console.info("[upload/prepare] signed URL created", {
+      centerEmail,
+      icdCode: icdCodeRaw,
+      storagePath,
+      bucket: bucket.name,
+      credentialSource: firebaseDebug.credentialSource,
+      serviceAccountEmail: firebaseDebug.serviceAccountEmail,
+      serviceAccountProjectId: firebaseDebug.serviceAccountProjectId,
+      serviceAccountPath: firebaseDebug.serviceAccountPath,
+    });
 
     return NextResponse.json(
       {
@@ -86,12 +98,40 @@ export async function POST(req: Request) {
         storagePath,
         safeName,
         mimeType,
+        debug: {
+          bucket: bucket.name,
+          credentialSource: firebaseDebug.credentialSource,
+          serviceAccountEmail: firebaseDebug.serviceAccountEmail,
+          serviceAccountProjectId: firebaseDebug.serviceAccountProjectId,
+          serviceAccountPath: firebaseDebug.serviceAccountPath,
+        },
       },
       { status: 200 },
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to prepare upload.";
-    return NextResponse.json({ message }, { status: 500 });
+    const firebaseDebug = getFirebaseDebugInfo();
+    console.error("[upload/prepare] failed", {
+      message,
+      bucket: firebaseDebug.bucketName,
+      credentialSource: firebaseDebug.credentialSource,
+      serviceAccountEmail: firebaseDebug.serviceAccountEmail,
+      serviceAccountProjectId: firebaseDebug.serviceAccountProjectId,
+      serviceAccountPath: firebaseDebug.serviceAccountPath,
+    });
+    return NextResponse.json(
+      {
+        message,
+        debug: {
+          bucket: firebaseDebug.bucketName,
+          credentialSource: firebaseDebug.credentialSource,
+          serviceAccountEmail: firebaseDebug.serviceAccountEmail,
+          serviceAccountProjectId: firebaseDebug.serviceAccountProjectId,
+          serviceAccountPath: firebaseDebug.serviceAccountPath,
+        },
+      },
+      { status: 500 },
+    );
   }
 }
 

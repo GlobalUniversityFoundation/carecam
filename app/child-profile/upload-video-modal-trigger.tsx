@@ -28,6 +28,14 @@ type UploadItem = {
   errorMessage?: string;
 };
 
+type UploadDebugInfo = {
+  bucket?: string;
+  credentialSource?: string;
+  serviceAccountEmail?: string | null;
+  serviceAccountProjectId?: string | null;
+  serviceAccountPath?: string;
+};
+
 export default function UploadVideoModalTrigger({
   topPercent,
   leftPercent,
@@ -143,6 +151,23 @@ export default function UploadVideoModalTrigger({
   ) =>
     new Promise<{ uploadedAt?: string; status?: string }>((resolve, reject) => {
       void (async () => {
+        const parseSignedUrlDebug = (urlText: string) => {
+          try {
+            const parsed = new URL(urlText);
+            return {
+              origin: parsed.origin,
+              path: parsed.pathname,
+              algorithm: parsed.searchParams.get("X-Goog-Algorithm"),
+              credential: parsed.searchParams.get("X-Goog-Credential"),
+              signedHeaders: parsed.searchParams.get("X-Goog-SignedHeaders"),
+              expires: parsed.searchParams.get("X-Goog-Expires"),
+              date: parsed.searchParams.get("X-Goog-Date"),
+            };
+          } catch {
+            return { invalidSignedUrl: true };
+          }
+        };
+
         const prepareRes = await fetch("/api/children/videos/prepare", {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -163,14 +188,31 @@ export default function UploadVideoModalTrigger({
           storagePath?: string;
           safeName?: string;
           mimeType?: string;
+          debug?: UploadDebugInfo;
         };
         if (!prepareRes.ok || !preparePayload.uploadUrl || !preparePayload.uploadEpoch || !preparePayload.storagePath) {
+          console.error("[upload-debug] prepare failed", {
+            status: prepareRes.status,
+            message: preparePayload.message,
+            debug: preparePayload.debug || null,
+          });
           reject(new Error(preparePayload.message || "Failed to prepare upload."));
           return;
         }
+        const signedUploadUrl = preparePayload.uploadUrl;
+        console.info("[upload-debug] prepare ok", {
+          icdCode,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type || "application/octet-stream",
+          storagePath: preparePayload.storagePath,
+          uploadEpoch: preparePayload.uploadEpoch,
+          firebase: preparePayload.debug || null,
+          signedUrl: parseSignedUrlDebug(signedUploadUrl),
+        });
 
         const xhr = new XMLHttpRequest();
-        xhr.open("PUT", preparePayload.uploadUrl);
+        xhr.open("PUT", signedUploadUrl);
         xhr.upload.onprogress = (event) => {
           if (!event.lengthComputable) {
             return;
@@ -182,9 +224,23 @@ export default function UploadVideoModalTrigger({
         };
         xhr.onload = () => {
           if (!(xhr.status >= 200 && xhr.status < 300)) {
-            reject(new Error("Upload failed."));
+            console.error("[upload-debug] GCS PUT failed", {
+              status: xhr.status,
+              statusText: xhr.statusText,
+              responseText: (xhr.responseText || "").slice(0, 4000),
+              storagePath: preparePayload.storagePath,
+              uploadEpoch: preparePayload.uploadEpoch,
+              firebase: preparePayload.debug || null,
+              signedUrl: parseSignedUrlDebug(signedUploadUrl),
+            });
+            reject(new Error(`Upload failed (${xhr.status}).`));
             return;
           }
+          console.info("[upload-debug] GCS PUT success", {
+            status: xhr.status,
+            storagePath: preparePayload.storagePath,
+            uploadEpoch: preparePayload.uploadEpoch,
+          });
           void (async () => {
             const completeRes = await fetch("/api/children/videos/complete", {
               method: "POST",
@@ -204,15 +260,41 @@ export default function UploadVideoModalTrigger({
               message?: string;
               uploadedAt?: string;
               status?: string;
+              debug?: UploadDebugInfo;
             };
             if (!completeRes.ok) {
+              console.error("[upload-debug] complete failed", {
+                status: completeRes.status,
+                message: completePayload.message,
+                debug: completePayload.debug || null,
+                storagePath: preparePayload.storagePath,
+                uploadEpoch: preparePayload.uploadEpoch,
+              });
               reject(new Error(completePayload.message || "Failed to finalize upload."));
               return;
             }
+            console.info("[upload-debug] complete ok", {
+              status: completeRes.status,
+              uploadedAt: completePayload.uploadedAt,
+              sessionStatus: completePayload.status,
+              storagePath: preparePayload.storagePath,
+              uploadEpoch: preparePayload.uploadEpoch,
+            });
             resolve(completePayload);
           })().catch(() => reject(new Error("Failed to finalize upload.")));
         };
-        xhr.onerror = () => reject(new Error("Network error during upload."));
+        xhr.onerror = () => {
+          console.error("[upload-debug] GCS PUT network error", {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            responseText: (xhr.responseText || "").slice(0, 4000),
+            storagePath: preparePayload.storagePath,
+            uploadEpoch: preparePayload.uploadEpoch,
+            firebase: preparePayload.debug || null,
+            signedUrl: parseSignedUrlDebug(signedUploadUrl),
+          });
+          reject(new Error("Network error during upload."));
+        };
         xhr.send(file);
       })().catch((error: unknown) => {
         reject(error instanceof Error ? error : new Error("Upload failed."));

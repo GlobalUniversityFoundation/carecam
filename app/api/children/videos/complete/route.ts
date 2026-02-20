@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   CHILD_VIDEO_SESSIONS_PREFIX,
+  getFirebaseDebugInfo,
   getBucket,
   normalizeIcdCodeForFile,
   requireCenterEmail,
@@ -60,6 +61,16 @@ export async function POST(req: Request) {
     const uploadedFile = bucket.file(storagePath);
     const [exists] = await uploadedFile.exists();
     if (!exists) {
+      const firebaseDebug = getFirebaseDebugInfo();
+      console.error("[upload/complete] uploaded file missing", {
+        centerEmail,
+        icdCode: icdCodeRaw,
+        uploadEpoch,
+        storagePath,
+        bucket: bucket.name,
+        credentialSource: firebaseDebug.credentialSource,
+        serviceAccountEmail: firebaseDebug.serviceAccountEmail,
+      });
       return NextResponse.json({ message: "Uploaded video file not found." }, { status: 404 });
     }
 
@@ -113,6 +124,18 @@ export async function POST(req: Request) {
     if (shouldAutoTriggerWorker()) {
       void triggerWorkerFinalizeEvent(bucket.name, storagePath);
     }
+    const firebaseDebug = getFirebaseDebugInfo();
+    console.info("[upload/complete] finalized", {
+      centerEmail,
+      icdCode: icdCodeRaw,
+      uploadEpoch,
+      storagePath,
+      bucket: bucket.name,
+      status: "Awaiting",
+      credentialSource: firebaseDebug.credentialSource,
+      serviceAccountEmail: firebaseDebug.serviceAccountEmail,
+      serviceAccountProjectId: firebaseDebug.serviceAccountProjectId,
+    });
 
     return NextResponse.json(
       {
@@ -127,7 +150,28 @@ export async function POST(req: Request) {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to finalize upload.";
-    return NextResponse.json({ message }, { status: 500 });
+    const firebaseDebug = getFirebaseDebugInfo();
+    console.error("[upload/complete] failed", {
+      message,
+      bucket: firebaseDebug.bucketName,
+      credentialSource: firebaseDebug.credentialSource,
+      serviceAccountEmail: firebaseDebug.serviceAccountEmail,
+      serviceAccountProjectId: firebaseDebug.serviceAccountProjectId,
+      serviceAccountPath: firebaseDebug.serviceAccountPath,
+    });
+    return NextResponse.json(
+      {
+        message,
+        debug: {
+          bucket: firebaseDebug.bucketName,
+          credentialSource: firebaseDebug.credentialSource,
+          serviceAccountEmail: firebaseDebug.serviceAccountEmail,
+          serviceAccountProjectId: firebaseDebug.serviceAccountProjectId,
+          serviceAccountPath: firebaseDebug.serviceAccountPath,
+        },
+      },
+      { status: 500 },
+    );
   }
 }
 
