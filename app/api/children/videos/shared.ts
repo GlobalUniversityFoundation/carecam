@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { cert, getApps, initializeApp } from "firebase-admin/app";
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
@@ -26,6 +26,7 @@ type FirebaseDebugInfo = {
 };
 
 let lastFirebaseDebugInfo: FirebaseDebugInfo | null = null;
+const UPLOAD_APP_NAME = "__carecam_upload_uploads__";
 
 type ChildProfileRecord = {
   center?: string;
@@ -40,7 +41,7 @@ type ChildVideoSessionRecord = {
 export function getBucket() {
   const serviceAccountPath =
     process.env.FIREBASE_SERVICE_ACCOUNT_PATH || DEFAULT_SERVICE_ACCOUNT_PATH;
-  const bucketName = process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_BUCKET;
+  const bucketName = (process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_BUCKET).trim();
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
   const serviceAccountJsonB64 = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_B64;
 
@@ -135,43 +136,40 @@ export function getBucket() {
     };
   };
 
-  if (!getApps().length) {
-    const envServiceAccount = parseServiceAccountFromEnv();
-    const fromFile = () => {
-          if (!fs.existsSync(serviceAccountPath)) {
-            throw new Error(`Service account JSON not found at ${serviceAccountPath}`);
-          }
-          return JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
-        };
-    const serviceAccount = envServiceAccount?.serviceAccount || fromFile();
-    const credentialSource: FirebaseDebugInfo["credentialSource"] = envServiceAccount
-      ? envServiceAccount.source
-      : "file_path";
+  const envServiceAccount = parseServiceAccountFromEnv();
+  const fromFile = () => {
+    if (!fs.existsSync(serviceAccountPath)) {
+      throw new Error(`Service account JSON not found at ${serviceAccountPath}`);
+    }
+    return JSON.parse(fs.readFileSync(serviceAccountPath, "utf8"));
+  };
 
-    initializeApp({
-      credential: cert(serviceAccount),
-      storageBucket: bucketName,
-    });
-    lastFirebaseDebugInfo = {
-      bucketName,
-      credentialSource,
-      serviceAccountEmail:
-        typeof serviceAccount?.client_email === "string" ? serviceAccount.client_email : null,
-      serviceAccountProjectId:
-        typeof serviceAccount?.project_id === "string" ? serviceAccount.project_id : null,
-      serviceAccountPath,
-    };
-  } else if (!lastFirebaseDebugInfo) {
-    lastFirebaseDebugInfo = {
-      bucketName,
-      credentialSource: "unknown",
-      serviceAccountEmail: null,
-      serviceAccountProjectId: null,
-      serviceAccountPath,
-    };
-  }
+  const serviceAccount = envServiceAccount?.serviceAccount || fromFile();
+  const credentialSource: FirebaseDebugInfo["credentialSource"] = envServiceAccount
+    ? envServiceAccount.source
+    : "file_path";
 
-  return getStorage().bucket(bucketName);
+  const existingUploadApp = getApps().find((app) => app.name === UPLOAD_APP_NAME);
+  const app =
+    existingUploadApp
+    || initializeApp(
+      {
+        credential: cert(serviceAccount),
+        storageBucket: bucketName,
+      },
+      UPLOAD_APP_NAME,
+    );
+  lastFirebaseDebugInfo = {
+    bucketName,
+    credentialSource,
+    serviceAccountEmail:
+      typeof serviceAccount?.client_email === "string" ? serviceAccount.client_email : null,
+    serviceAccountProjectId:
+      typeof serviceAccount?.project_id === "string" ? serviceAccount.project_id : null,
+    serviceAccountPath,
+  };
+
+  return getStorage(app).bucket(bucketName);
 }
 
 export function getFirebaseDebugInfo(): FirebaseDebugInfo {
