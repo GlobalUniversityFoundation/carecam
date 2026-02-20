@@ -210,12 +210,18 @@ export function shouldAutoTriggerWorker() {
   if (process.env.WORKER_AUTO_TRIGGER_UPLOADS === "false") {
     return false;
   }
+  // In production, enable auto-trigger whenever a worker endpoint is configured.
+  if (process.env.WORKER_ENDPOINT?.trim() || process.env.WORKER_LOCAL_ENDPOINT?.trim()) {
+    return true;
+  }
   return process.env.NODE_ENV === "development";
 }
 
 export async function triggerWorkerFinalizeEvent(bucketName: string, objectName: string) {
   const endpoint =
-    process.env.WORKER_LOCAL_ENDPOINT || "http://127.0.0.1:8080/pubsub/storage-finalize";
+    process.env.WORKER_ENDPOINT?.trim()
+    || process.env.WORKER_LOCAL_ENDPOINT?.trim()
+    || "http://127.0.0.1:8080/pubsub/storage-finalize";
   const payload = {
     eventType: "OBJECT_FINALIZE",
     bucket: bucketName,
@@ -233,7 +239,7 @@ export async function triggerWorkerFinalizeEvent(bucketName: string, objectName:
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 1500);
   try {
-    await fetch(endpoint, {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -248,6 +254,13 @@ export async function triggerWorkerFinalizeEvent(bucketName: string, objectName:
       }),
       signal: controller.signal,
     });
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(
+        `Worker trigger returned ${response.status} ${response.statusText}${errorText ? `: ${errorText.slice(0, 500)}` : ""}`,
+      );
+    }
+    console.info(`[worker-trigger] queued ${objectName} via ${endpoint}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`Worker trigger failed for ${objectName}: ${message}`);

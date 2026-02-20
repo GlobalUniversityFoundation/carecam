@@ -123,6 +123,15 @@ export async function POST(req: Request) {
 
     if (shouldAutoTriggerWorker()) {
       void triggerWorkerFinalizeEvent(bucket.name, storagePath);
+    } else {
+      console.info("[upload/complete] worker trigger skipped", {
+        storagePath,
+        reason: "auto-trigger-disabled",
+        nodeEnv: process.env.NODE_ENV,
+        workerAutoTriggerUploads: process.env.WORKER_AUTO_TRIGGER_UPLOADS ?? null,
+        workerEndpointConfigured: Boolean(process.env.WORKER_ENDPOINT?.trim()),
+        workerLocalEndpointConfigured: Boolean(process.env.WORKER_LOCAL_ENDPOINT?.trim()),
+      });
     }
     const firebaseDebug = getFirebaseDebugInfo();
     console.info("[upload/complete] finalized", {
