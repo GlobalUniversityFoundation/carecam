@@ -32,23 +32,75 @@ export function getBucket() {
     process.env.FIREBASE_SERVICE_ACCOUNT_PATH || DEFAULT_SERVICE_ACCOUNT_PATH;
   const bucketName = process.env.FIREBASE_STORAGE_BUCKET || DEFAULT_BUCKET;
   const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const serviceAccountJsonB64 = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_B64;
+
+  const parseServiceAccountFromEnv = () => {
+    const raw = (serviceAccountJsonB64?.trim()
+      ? Buffer.from(serviceAccountJsonB64.trim(), "base64").toString("utf8")
+      : serviceAccountJson || "").trim();
+    if (!raw) return null;
+
+    const candidates = new Set<string>([raw]);
+    if (
+      (raw.startsWith('"') && raw.endsWith('"')) ||
+      (raw.startsWith("'") && raw.endsWith("'"))
+    ) {
+      candidates.add(raw.slice(1, -1));
+    }
+    candidates.add(raw.replace(/\\"/g, '"'));
+
+    let parsed: unknown = null;
+    for (const candidate of candidates) {
+      try {
+        parsed = JSON.parse(candidate);
+      } catch {
+        parsed = null;
+      }
+      if (typeof parsed === "string") {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch {
+          parsed = null;
+        }
+      }
+      if (parsed && typeof parsed === "object") {
+        break;
+      }
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    const normalized = parsed as {
+      private_key?: string;
+      client_email?: string;
+      private_key_id?: string;
+      [key: string]: unknown;
+    };
+
+    if (typeof normalized.private_key === "string") {
+      let pk = normalized.private_key;
+      // Handle keys pasted with one or more levels of escaping.
+      for (let i = 0; i < 3; i += 1) {
+        pk = pk.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r\n/g, "\n");
+      }
+      normalized.private_key = pk.trim();
+    }
+    if (typeof normalized.client_email === "string") {
+      normalized.client_email = normalized.client_email.trim();
+    }
+
+    if (!normalized.private_key || !normalized.client_email) {
+      return null;
+    }
+
+    return normalized;
+  };
 
   if (!getApps().length) {
-    const serviceAccount = serviceAccountJson?.trim()
-      ? (() => {
-          const parsed = JSON.parse(serviceAccountJson) as {
-            private_key?: string;
-            client_email?: string;
-          };
-          if (typeof parsed.private_key === "string") {
-            parsed.private_key = parsed.private_key.replace(/\\n/g, "\n").replace(/\r\n/g, "\n");
-          }
-          if (typeof parsed.client_email === "string") {
-            parsed.client_email = parsed.client_email.trim();
-          }
-          return parsed;
-        })()
-      : (() => {
+    const serviceAccount = parseServiceAccountFromEnv()
+      || (() => {
           if (!fs.existsSync(serviceAccountPath)) {
             throw new Error(`Service account JSON not found at ${serviceAccountPath}`);
           }
