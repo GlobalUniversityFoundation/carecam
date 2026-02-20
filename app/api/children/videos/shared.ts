@@ -35,7 +35,19 @@ export function getBucket() {
 
   if (!getApps().length) {
     const serviceAccount = serviceAccountJson?.trim()
-      ? JSON.parse(serviceAccountJson)
+      ? (() => {
+          const parsed = JSON.parse(serviceAccountJson) as {
+            private_key?: string;
+            client_email?: string;
+          };
+          if (typeof parsed.private_key === "string") {
+            parsed.private_key = parsed.private_key.replace(/\\n/g, "\n").replace(/\r\n/g, "\n");
+          }
+          if (typeof parsed.client_email === "string") {
+            parsed.client_email = parsed.client_email.trim();
+          }
+          return parsed;
+        })()
       : (() => {
           if (!fs.existsSync(serviceAccountPath)) {
             throw new Error(`Service account JSON not found at ${serviceAccountPath}`);
