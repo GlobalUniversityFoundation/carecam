@@ -14,6 +14,8 @@ const MAX_TRANSIENT_RETRIES = 5;
 const MERGE_GAP_SECONDS = 2.5;
 const VALIDATION_MARGIN_SECONDS = 3;
 const MIN_ACTION_DURATION_SECONDS = 0.8;
+const GEMINI_CALL_TIMEOUT_MS = Number(process.env.GEMINI_CALL_TIMEOUT_MS || 120_000);
+const FILE_READY_TIMEOUT_MS = Number(process.env.GEMINI_FILE_READY_TIMEOUT_MS || 300_000);
 
 const VISUAL_BEHAVIORS = [
   "hitting the therapist with hand",
@@ -90,6 +92,18 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function withTimeout(promise, timeoutMs, label) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return promise;
+  }
+  return Promise.race([
+    promise,
+    sleep(timeoutMs).then(() => {
+      throw new Error(`${label} timed out after ${timeoutMs}ms`);
+    }),
+  ]);
+}
+
 function isRateLimitError(error) {
   const message = String(error?.message || "").toLowerCase();
   return (
@@ -154,7 +168,7 @@ async function callWithPolicy(globalRateController, label, requestFn) {
   while (true) {
     await globalRateController.waitIfPaused();
     try {
-      return await requestFn();
+      return await withTimeout(requestFn(), GEMINI_CALL_TIMEOUT_MS, label);
     } catch (error) {
       if (isRateLimitError(error)) {
         if (rateLimitHitCount === 0) {
@@ -415,10 +429,14 @@ async function burnTimestampOverlay(inputPath, outputPath) {
 }
 
 async function waitForFileReady(ai, fileName) {
-  let file = await ai.files.get({ name: fileName });
+  const deadline = Date.now() + FILE_READY_TIMEOUT_MS;
+  let file = await withTimeout(ai.files.get({ name: fileName }), GEMINI_CALL_TIMEOUT_MS, "file-get");
   while (file.state === "PROCESSING") {
+    if (Date.now() > deadline) {
+      throw new Error(`Gemini file stayed PROCESSING beyond ${FILE_READY_TIMEOUT_MS}ms`);
+    }
     await sleep(1000);
-    file = await ai.files.get({ name: fileName });
+    file = await withTimeout(ai.files.get({ name: fileName }), GEMINI_CALL_TIMEOUT_MS, "file-get");
   }
   if (file.state !== "ACTIVE") {
     throw new Error(`Uploaded file is not ACTIVE (state=${file.state}).`);
@@ -587,10 +605,14 @@ export async function analyzeVideo({
   }
 
   logger.log(`Uploading video to Gemini: ${analysisInputPath}`);
-  const uploaded = await ai.files.upload({
-    file: analysisInputPath,
-    config: { mimeType: "video/mp4" },
-  });
+  const uploaded = await withTimeout(
+    ai.files.upload({
+      file: analysisInputPath,
+      config: { mimeType: "video/mp4" },
+    }),
+    GEMINI_CALL_TIMEOUT_MS,
+    "file-upload",
+  );
   const geminiFile = await waitForFileReady(ai, uploaded.name);
 
   const durationSec = await getVideoDurationSec(analysisInputPath);

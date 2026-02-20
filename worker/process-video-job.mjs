@@ -114,6 +114,7 @@ export async function processVideoObject({
   objectName,
   logger = console,
 }) {
+  const startedAtMs = Date.now();
   if (!objectName || !objectName.startsWith(CHILD_VIDEOS_PREFIX) || objectName.endsWith("/")) {
     return { ignored: true, reason: "unsupported_object" };
   }
@@ -142,6 +143,9 @@ export async function processVideoObject({
   if (!sessionRecordPath) {
     throw new Error(`Session record not found for video ${objectName}`);
   }
+  logger.log(
+    `[worker] picked object=${objectName} bucket=${bucket.name} session=${sessionRecordPath}`,
+  );
 
   const session = await readJsonFile(bucket, sessionRecordPath);
   if (
@@ -168,13 +172,16 @@ export async function processVideoObject({
   fs.mkdirSync(outputDir, { recursive: true });
 
   try {
+    logger.log("[worker] downloading source video...");
     await sourceFile.download({ destination: inputPath });
+    logger.log("[worker] starting analysis...");
     const analysis = await analyzeVideo({
       videoPath: inputPath,
       outputDir,
       geminiApiKey: process.env.GEMINI_API_KEY,
       logger,
     });
+    logger.log("[worker] analysis complete, uploading artifacts...");
 
     const safeUploadEpoch = uploadEpoch || String(Date.now());
     const analysisPrefix = `${CHILD_VIDEO_ANALYSIS_PREFIX}/${icdKey}/${safeUploadEpoch}`;
@@ -221,6 +228,9 @@ export async function processVideoObject({
       },
       linkedSourceVideoPath: objectName,
     });
+    logger.log(
+      `[worker] done session=${sessionRecordPath} elapsedMs=${Date.now() - startedAtMs}`,
+    );
 
     return {
       ok: true,
