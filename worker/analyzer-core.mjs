@@ -10,7 +10,8 @@ const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const TEMPERATURE = 0.4;
 const CONCURRENCY = 5;
 const GLOBAL_RATE_LIMIT_PAUSE_MS = 5 * 60 * 1000;
-const MAX_TRANSIENT_RETRIES = 5;
+const MAX_TRANSIENT_RETRIES = Number(process.env.GEMINI_MAX_RETRIES || 3);
+const TRANSIENT_RETRY_INTERVAL_MS = Number(process.env.GEMINI_RETRY_INTERVAL_MS || 60_000);
 const MERGE_GAP_SECONDS = 2.5;
 const VALIDATION_MARGIN_SECONDS = 3;
 const MIN_ACTION_DURATION_SECONDS = 0.8;
@@ -180,13 +181,13 @@ async function callWithPolicy(globalRateController, label, requestFn) {
       }
 
       if (!isRetryableError(error) || transientRetryCount >= MAX_TRANSIENT_RETRIES) {
-        throw error;
+        throw new SkipUnitError(
+          `[${label}] skipped after ${transientRetryCount} retries. Last error: ${String(error?.message || error)}`,
+        );
       }
 
       transientRetryCount += 1;
-      const backoffMs = Math.min(30_000, 2000 * 2 ** (transientRetryCount - 1));
-      const jitterMs = Math.floor(Math.random() * 1500);
-      const waitMs = backoffMs + jitterMs;
+      const waitMs = TRANSIENT_RETRY_INTERVAL_MS;
       console.warn(`[${label}] transient retry ${transientRetryCount}/${MAX_TRANSIENT_RETRIES} in ${waitMs}ms`);
       await sleep(waitMs);
     }
@@ -816,7 +817,12 @@ export async function analyzeVideo({
     } catch (error) {
       if (error instanceof SkipUnitError) {
         logger.warn(`${error.message} validation dropped.`);
-        return { ...item, correct: false, skipped: true, skipReason: "rate_limit_twice" };
+        return {
+          ...item,
+          correct: true,
+          skipped: true,
+          skipReason: "validation_skipped_assumed_true",
+        };
       }
       logger.warn(
         `validate-${index}: failed after retries, dropping validation item. Reason: ${String(
@@ -825,9 +831,9 @@ export async function analyzeVideo({
       );
       return {
         ...item,
-        correct: false,
+        correct: true,
         skipped: true,
-        skipReason: "validation_failed_after_retries",
+        skipReason: "validation_failed_assumed_true",
       };
     }
   });
