@@ -122,7 +122,11 @@ export async function POST(req: Request) {
     );
 
     if (shouldAutoTriggerWorker()) {
-      void triggerWorkerFinalizeEvent(bucket.name, storagePath);
+      const triggerResult = await triggerWorkerFinalizeEvent(bucket.name, storagePath);
+      console.info("[upload/complete] worker trigger result", {
+        storagePath,
+        triggerResult,
+      });
     } else {
       console.info("[upload/complete] worker trigger skipped", {
         storagePath,

@@ -71,6 +71,8 @@ On failure, session is updated to `Failed` with `processingError`.
 - `GEMINI_API_KEY`
 - `GEMINI_MODEL` (optional, defaults to `gemini-2.5-flash`)
 - `WORKER_API_TOKEN` (optional; if set, worker expects `Authorization: Bearer <token>`)
+- `WORKER_ENDPOINT` (recommended in production, e.g. Cloud Run `/pubsub/storage-finalize`)
+- `WORKER_TRIGGER_TIMEOUT_MS` (optional; default `15000`)
 
 ### Local Worker Run
 

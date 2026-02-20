@@ -245,7 +245,8 @@ export async function triggerWorkerFinalizeEvent(bucketName: string, objectName:
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 1500);
+  const timeoutMs = Number(process.env.WORKER_TRIGGER_TIMEOUT_MS || 15000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -269,9 +270,11 @@ export async function triggerWorkerFinalizeEvent(bucketName: string, objectName:
       );
     }
     console.info(`[worker-trigger] queued ${objectName} via ${endpoint}`);
+    return { ok: true as const, endpoint };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`Worker trigger failed for ${objectName}: ${message}`);
+    return { ok: false as const, endpoint, error: message };
   } finally {
     clearTimeout(timeout);
   }
